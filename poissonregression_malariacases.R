@@ -114,12 +114,18 @@ if(create_out_dir_param==TRUE){
 data_fname <- file.path(in_dir,"malaria_incidence_yrs_94dmi_Mjo.csv")
 
 #mal_inc <- read.table('malaria_incidence_yrs.csv', header=TRUE, sep=',')
-mal_inc <- read.table(data_fname, header=TRUE, sep=',')
-
 #mal_inc <- read.table('malaria_incidence_yrs_94dmi_Mjo.csv', header=TRUE, sep=',')
 
+mal_inc <- read.table(data_fname, header=TRUE, sep=',')
 #rain_index <- read.table('rainfall_index.csv', header=TRUE, sep=',')
-rain_fall <- read.table('rainfall_data.csv', header=TRUE, sep=',')
+rain_fall <- read.table(file.path(in_dir,'rainfall_data.csv'), header=TRUE, sep=',')
+
+View(mal_inc)
+View(rain_fall)
+dim(rain_fall)
+dim(mal_inc)
+
+###### PART I: Reformat data and link to shapefile #################
 
 lmp_arr <- array(data=NA, dim=c((ncol(rain_index)-1), 6))
 lmcoef_arr <- array(data=NA, dim=c((ncol(rain_index)-1), 6))
@@ -193,3 +199,6 @@ write.table(lmcilow_arr, 'CIlow_malpoisson_oni_iod94_rf_mjo.txt')
 write.table(lmciabove_arr, 'CIabove_malpoisson_oni_iod94_rf_mjo.txt')
 
 write.table(aic_total, 'aic_malpoisson_oni_iod_rf_mjo.txt')
+
+
+##################################  END OF SCRIPT #####################################
