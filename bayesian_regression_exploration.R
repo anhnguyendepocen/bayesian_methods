@@ -41,7 +41,7 @@ library(car)
 library(sf)
 library(brinla)
 library(INLA)
-
+library(MCMCglmm)
 
 ###### Functions used in this script and sourced from other files
 
@@ -71,6 +71,7 @@ load_obj <- function(f){
 #script_path <- "/nfs/bparmentier-data/Data/projects/bayesian_Drosophila_PERA_analysis/scripts" #path to script #PARAM 
 #source(file.path(script_path,function_processing_data)) #source all functions used in this script 1.
 
+
 ############################################################################
 #####  Parameters and argument set up ###########
 
@@ -89,7 +90,6 @@ create_out_dir_param=TRUE #PARAM9
 
 if(is.null(out_dir)){
   out_dir <- in_dir #output will be created in the input dir
-  
 }
 #out_dir <- in_dir #output will be created in the input dir
 
@@ -123,9 +123,12 @@ hubtoage(coef(lmod))
 hubtoage(bci)
 
 #library(INLA)
+
+## Let's use an uninformative prior
+# set the precision to a very small number. The precision is inverse of variance.
 imod <- inla(y ~ x - 1, 
              family = "gaussian",
-             control.fixed = list(prec = 1e-09), 
+             control.fixed = list(prec = 1e-09), # set control on prior
              data = hubble)
 
 summary(imod)
@@ -141,48 +144,79 @@ ageden <- inla.tmarginal(hubtoage, imod$marginals.fixed$x)
 plot(ageden, type = "l", xlab = "Age in billions of years",
      ylab = "density")
 abline(v = hubtoage(ibci[c(3, 5)]), lty = 2)
+
+###### Use a different prior: with prior information
+
+#Before Hubble Space Telescpe age was estimated between 10-20 billion years.
+#Transform tis guess using the hubtoage
 hubtoage(c(10, 15, 20))
 
-imod <- inla(y ~ x - 1, 
+#this suggest a mean prior or 65
+
+var_val <- hubtoage(c(10, 15, 20))[1] - hubtoage(c(10, 15, 20))[3]
+
+variance_prior <- round(var_val/4) # 95% interval goes from -1.96 to 1.96 or about 4 
+print(variance_prior)
+
+mean_prior <- 65
+sd_prior <- 12
+var_prior <- 12^2
+precision_prior <- 1/(sd_prior^2)
+
+imod2 <- inla(y ~ x - 1, 
              family = "gaussian",
              control.fixed = list(mean = 65, prec = 1/(12^2)), 
              data = hubble)
 
-(ibci <- imod$summary.fixed)
-hubtoage(ibci[c(1, 3, 4, 5, 6)])
-(uhub <- hubtoage((2016 + 4004 - 1)/1e+09))
-imod <- inla(y ~ x - 1, family = "gaussian",
-             control.fixed = list(mean = 65, prec = 1/(12^2)), data = hubble)
-(ibci <- imod$summary.fixed)
-hubtoage(ibci[c(1, 3, 4, 5, 6)])
+(ibci <- imod2$summary.fixed)
+plot(imod$summary.fixed)
 
-# Bayes Theory
+plot(imod2$marginals.fixed$x,
+     main=paste0("Distribution of beta with informed prior(",c(mean_prior,var_prior),")"),
+     type = "l", xlab = "beta",
+     ylab = "density", xlim = c(60, 100))
 
+########################
+##### Use MCMC to sample the Posterior:
 
-# Prior and Posterior Distributions
+trueA <- 5
+trueB <- 0
+trueSd <- 10
+sampleSize <- 31
 
+# create independent x-values 
+x <- (-(sampleSize-1)/2):((sampleSize-1)/2)
+# create dependent values according to ax + b + N(0,sd)
+y <-  trueA * x + trueB + rnorm(n=sampleSize,mean=0,sd=trueSd)
 
-# Model Checking
+plot(x,y, main="Test Data")
 
+#https://theoreticalecology.wordpress.com/2010/09/17/metropolis-hastings-mcmc-in-r/
+  
+#a linear relationship y = a*x + b 
 
-# Model Selection
+likelihood <- function(param){
+  a = param[1]
+  b = param[2]
+  sd = param[3]
+    
+  pred = a*x + b
+  singlelikelihoods = dnorm(y, mean = pred, sd = sd, log = T)
+  sumll = sum(singlelikelihoods)
+  return(sumll)   
+}
 
+# Example: plot the likelihood profile of the slopmdAnn2016
+<- function(x){return(likelihood(c(x, trueB, trueSd)))}
+slopelikelihoods <- lapply(seq(3, 7, by=.05), slopevalues )
+plot (seq(3, 7, by=.05), slopelikelihoods , type="l", 
+      xlab = "values of slope parameter a", ylab = "Log likelihood")
 
-# Hypothesis testing
-
-
-# Bayesian Computation
-
-sessionInfo()
-
-
-
-
-
-
+likelihood_fun = dnorm(y, mean = pred, sd = sd, log = T)
 
 #https://stats.idre.ucla.edu/r/faq/normal/
   
+https://www4.stat.ncsu.edu/~reich/ST740/code/
   
 # fplot <- function(x, params, pdf) {
 #   
