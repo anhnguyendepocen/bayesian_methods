@@ -1,27 +1,19 @@
-####################################    Space Time Analyses PAPER   #######################################
-############################  Yucatan case study: SAR, SARMA etc -PART 2  #######################################
-#This script produces a prediction for the dates following the Hurricane event.       
-#The script uses spatial neighbours to predict Light data values in the Hurricane Katrina New Orleans region. 
-#Temporal predictions use OLS with the image of the previous time or the ARIMA method.
+####################################    Spatio-Temporal Analysis Malaria  #######################################
+######################################   Malaria Indian State Analysis #######################################
+#This script produces provides an analysis of Malaria case in India.       
+#
 #AUTHORS: Benoit Parmentier                                             
-#DATE CREATED: 03/09/2014 
-#DATE MODIFIED: 03/16/2017
-#Version: 3
-#PROJECT: GLP Conference Berlin,YUCATAN CASE STUDY with Marco Millones            
-#PROJECT: Workshop for William and Mary: an intro to geoprocessing with R 
-#PROJECT: AAG 2015 in Chicago, with Marco Millones
-#PROJECT: Geocomputation conference in Dallas with Marco Millones
-#
-#COMMENTS: - Testing alternative methods to eigen for spatial predictions: "Chebyshev" on new light data
-#         - clean up and organize code to be more general for any dataset
+#DATE CREATED: 04/25/2018 
+#DATE MODIFIED: 04/30/2018
+#Version: 1
+#PROJECT: India research from Neeti            
+
+#COMMENTS: - adding spatial data.frame
+
 #TO DO:
-# - add confidence interval around reg coef: this is important!!
-# - add variance around the MAE values in the accuracy assessment
-# - modify parallelization so that it works both on windows and linux/macos
-# - automation to call from the terminal/shell
+# - run analyses with all states at once
 #
-#
-#COMMIT: moving aggregation majority function to function script
+#COMMIT: clean up and adding spatial boundaries
 #
 #################################################################################################
 
@@ -49,6 +41,7 @@ library(lubridate) #date and time handling tools
 library(colorRamps) #contains matlab.like color palette
 library(rgeos) #spatial analysis, topological and geometric operations e.g. interesect, union, contain etc.
 library(sphet) #spatial analyis, regression eg.contains spreg for gmm estimation
+library(reshape2)
 
 ###### Functions used in this script
 
@@ -72,8 +65,11 @@ create_dir_fun <- function(outDir,out_suffix=NULL){
 #####  Parameters and argument set up ###########
 
 #in_dir <- "/Users/neeti/Documents/neeti/TERIwork/aditi/"
-in_dir <- "/home/bparmentier/Google Drive/Data/India_Research/malaria_study_by_state/data"
-out_dir <- "/home/bparmentier/Google Drive/Data/India_Research/malaria_study_by_state/outputs"
+#in_dir <- "/home/bparmentier/Google Drive/Data/India_Research/malaria_study_by_state/data"
+#out_dir <- "/home/bparmentier/Google Drive/Data/India_Research/malaria_study_by_state/outputs"
+
+in_dir <- "/home/benoit/Data/India_Research/malaria_study_by_state/data"
+out_dir <- "/home/benoit/Data/India_Research/malaria_study_by_state/outputs"
 
 #proj_modis_str <-"+proj=sinu +lon_0=0 +x_0=0 +y_0=0 +a=6371007.181 +b=6371007.181 +units=m +no_defs" #CONST 1
 #CRS_interp <-"+proj=longlat +ellps=WGS84 +datum=WGS84 +towgs84=0,0,0" #Station coords WGS84
@@ -84,10 +80,10 @@ CRS_reg <- CRS_WGS84 # PARAM 4
 file_format <- ".tif" #PARAM5
 NA_value <- -9999 #PARAM6
 NA_flag_val <- NA_value #PARAM7
-out_suffix <-"malaria_india_04062017" #output suffix for the files and ouptu folder #PARAM 8
+out_suffix <-"malaria_india_04302018" #output suffix for the files and ouptu folder #PARAM 8
 create_out_dir_param=TRUE #PARAM9
 
-data_fname <- file.path(in_dir,"dat_reg2_var_list_NDVI_NDVI_Katrina_04102015.txt")
+#data_fname <- file.path(in_dir,"dat_reg2_var_list_NDVI_NDVI_Katrina_04102015.txt")
 
 ################# START SCRIPT ###############################
 
@@ -123,7 +119,52 @@ rain_fall <- read.table(file.path(in_dir,'rainfall_data.csv'), header=TRUE, sep=
 View(mal_inc)
 View(rain_fall)
 dim(rain_fall)
+View(rain_fall)
 dim(mal_inc)
+
+
+### Need to combine both together.
+names(mal_inc)
+View(mal_inc)
+names(mal_inc)[1:5]
+
+n <- ncol(mal_inc)
+n
+
+test <- as.data.frame(t(mal_inc[6:n]))
+test2 <- as.data.frame(t(mal_inc[1:5]))
+
+
+dim(test)
+View(test2)
+test$state <- rownames(test)
+View(test)
+
+names(test2) <- 1994:2017
+test2 <- test2[-1,]
+names(test) <- 1994:2017
+
+mdata <- melt(test, value.name=c("state","time"))
+mdata <- melt(test, 
+                     variable.name =c("state"),
+                     value.names = c("time"))
+
+test2$var <- rownames(test2)
+m_var <- melt(test2, 
+              #variable.name =c("state"),
+              value.names = c("time"))
+
+View(m_var)
+dim(mdata)
+class(mdata)
+names(mdata) <- c("state","year","mal_inc")
+View(mdata)
+24*36
+
+
+lmp_arr <- array(data=NA, dim=c((ncol(rain_index)-1), 6))
+
+<- vector(test)
 
 ###### PART I: Reformat data and link to shapefile #################
 
