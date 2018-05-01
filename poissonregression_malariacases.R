@@ -4,7 +4,7 @@
 #
 #AUTHORS: Benoit Parmentier                                             
 #DATE CREATED: 04/25/2018 
-#DATE MODIFIED: 04/30/2018
+#DATE MODIFIED: 05/01/2018
 #Version: 1
 #PROJECT: India research from Neeti            
 
@@ -132,8 +132,50 @@ n <- ncol(mal_inc)
 n
 
 test <- as.data.frame(t(mal_inc[6:n]))
-test2 <- as.data.frame(t(mal_inc[1:5]))
+#test2 <- as.data.frame(t(mal_inc[1:5]))
 
+data_df <- as.data.frame(t(mal_inc[,-1]))
+data_df$var <- rownames(data)
+names(data_df) <- 1994:2017
+View(data)
+names(mal_inc)[2:5]
+
+names(test) <- 1994:2017
+test$state <- rownames(test)
+mdata <- melt(test, 
+              variable.name =c("state"),
+              value.names = c("state","year")
+              #id=c("state","year")
+              )
+names(mdata)[2] <- "year"
+View(mdata)
+names(mdata)[3] <- "mal_inc" 
+View(mdata)
+test <- merge(mdata,mal_inc[,1:5],by="year")
+View(test)
+#test3 <- gather(mal_inc[c(6:n)],state,names_state)
+#variable.name =c("state"),
+#value.names = c("time"))
+
+#View(test3)
+#names_state <- names(mal_inc)[6:n]
+#var_names <- names(mal_inc)[2:5]
+#names(mal_inc)[1] <- "year"
+#test3 <- melt(mal_inc[c(1,6:n)],
+#        measure=var_names, 
+#        id=c("year",names_state))
+
+data_df <- t(test3)        
+View(data_df)
+View(test3)
+mdata_all <- melt(data, 
+              variable.name =c("state"),
+              value.name = c("time",names(mal_inc)[2:5]))
+View(data)
+View(mal_inc)
+test3 <- gather(mal_inc,state,names_state)
+View(test3)
+mdata <- melt(test, 
 
 dim(test)
 View(test2)
@@ -145,9 +187,6 @@ test2 <- test2[-1,]
 names(test) <- 1994:2017
 
 mdata <- melt(test, value.name=c("state","time"))
-mdata <- melt(test, 
-                     variable.name =c("state"),
-                     value.names = c("time"))
 
 test2$var <- rownames(test2)
 m_var <- melt(test2, 
