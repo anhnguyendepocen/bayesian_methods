@@ -42,6 +42,7 @@ library(colorRamps) #contains matlab.like color palette
 library(rgeos) #spatial analysis, topological and geometric operations e.g. interesect, union, contain etc.
 library(sphet) #spatial analyis, regression eg.contains spreg for gmm estimation
 library(reshape2)
+library(lme4)
 
 ###### Functions used in this script
 
@@ -155,7 +156,7 @@ View(data_df)
 #                       data=data_df,
 #                       family=poisson(link=log))
 
-data_df$year <- as.numeric(data_df$year)
+data_df$year <- as.numeric(as.character(data_df$year))
 class(data_df$state)
 class(data_df$ONI_DJF)
 
@@ -164,7 +165,47 @@ mod_glm_poisson <- glm(mal_inc ~ state + year + ONI_DJF + DMI_ASO + MJO_DJFM + M
                        data=data_df,
                        family=poisson(link=log))
 mod_glm_poisson
+summary(mod_glm_poisson)
 
+plot(mal_inc ~ year,data=data_df)
+xyplot(mal_inc ~ year | state,data=data_df)
+
+plot(mal_inc ~ year, subset(data_df,state=="GOA"))
+plot(mal_inc ~ year, subset(data_df,state=="CHHATTISGARH")) #ok problem in the data, there are zero
+                                                            #when it should be NA
+
+unique(data_df$state)
+#?over dispersion?
+#### Do spatial poisson
+
+#Maybe mixed effect is needed?
+mod_glm_poisson <- glm(mal_inc ~ state + year + ONI_DJF + DMI_ASO + MJO_DJFM + MJO_JJAS, 
+                       data=data_df,
+                       family=poisson(link=log))
+summary(mod_glm_poisson)
+### Mixed effect model
+#https://bbolker.github.io/mixedmodels-misc/glmmFAQ.html
+
+#https://stats.idre.ucla.edu/r/dae/mixed-effects-logistic-regression/
+#https://stats.idre.ucla.edu/other/mult-pkg/introduction-to-generalized-linear-mixed-models/
+#https://rpubs.com/wsundstrom/t_panel
+
+mod_glmer_poisson <- glmer(mal_inc ~ year + ONI_DJF + DMI_ASO + MJO_DJFM + MJO_JJAS + (1|state), 
+      data = data_df, family = poisson(link=log))
+
+mod_glmer_poisson <- glmer(mal_inc ~ year + ONI_DJF + DMI_ASO + MJO_DJFM + MJO_JJAS |state, 
+                           data = data_df, family = poisson(link=log))
+
+mod_glmer_poisson <- glmer(mal_inc ~ year + (1+ year| state) + ONI_DJF + DMI_ASO + MJO_DJFM 
+                           + MJO_JJAS , 
+                           data = data_df, family = poisson(link=log))
+
+summary(mod_glmer_poisson)
+
+summary(mod_glmer_poisson)
+# should we normalize by area?
+
+#############
 
 #for (i in 6:35){
 #  j <- i -4
