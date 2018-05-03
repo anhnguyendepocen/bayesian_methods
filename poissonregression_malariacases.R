@@ -2,7 +2,7 @@
 ######################################   Malaria Indian State Analysis #######################################
 #This script produces provides an analysis of Malaria case in India.       
 #
-#AUTHORS: Benoit Parmentier                                             
+#AUTHORS: Benoit Parmentier, Neeti Neeti                                             
 #DATE CREATED: 04/25/2018 
 #DATE MODIFIED: 05/02/2018
 #Version: 1
@@ -193,30 +193,43 @@ summary(mod_glm_poisson)
 mod_glmer_poisson <- glmer(mal_inc ~ year + ONI_DJF + DMI_ASO + MJO_DJFM + MJO_JJAS + (1|state), 
       data = data_df, family = poisson(link=log))
 
-mod_glmer_poisson <- glmer(mal_inc ~ year + ONI_DJF + DMI_ASO + MJO_DJFM + MJO_JJAS |state, 
+#mod_glmer_poisson <- glmer(mal_inc ~ year + ONI_DJF + DMI_ASO + MJO_DJFM + MJO_JJAS |state, 
+#                           data = data_df, family = poisson(link=log))
+
+## GLM mixed effect model
+### here we model the slope and intercept per state for the year variable
+#as random effect
+### we also have the overall slope for year (fixed effect) and slopes for other var
+mod_glmer_poisson <- glmer(mal_inc ~ year + (1+ year| state) + 
+                             ONI_DJF + DMI_ASO + MJO_DJFM + MJO_JJAS , 
                            data = data_df, family = poisson(link=log))
 
-mod_glmer_poisson <- glmer(mal_inc ~ year + (1+ year| state) + ONI_DJF + DMI_ASO + MJO_DJFM 
-                           + MJO_JJAS , 
-                           data = data_df, family = poisson(link=log))
-
-summary(mod_glmer_poisson)
+summary(mod_glmer_poisson) #did not converge...
 
 summary(mod_glmer_poisson)
 # should we normalize by area?
 
-#############
+#install.packages("INLA", repos=c(getOption("repos"), INLA="https://inla.r-inla-download.org/R/stable"), dep=TRUE)
+
+
+
+############# Spatial model
+
+
+
+##################################  END OF SCRIPT #####################################
+
 
 #for (i in 6:35){
 #  j <- i -4
 #res <- glm(mal_inc1[,i] ~mal_inc1$ONI+mal_inc1$DMI+rain_index[,j], family=poisson(link=log))
-  #res <- glm(mal_inc1[,i] ~mal_inc1$ONI+mal_inc1$DMI, family=poisson(link=log))
+#res <- glm(mal_inc1[,i] ~mal_inc1$ONI+mal_inc1$DMI, family=poisson(link=log))
 #res <- glm(mal_inc1[,i] ~mal_inc1$ONI_DJF+mal_inc1$DMI_ASO+mal_inc1$MJO_DJFM+mal_inc1$MJO_JJAS + rain_fall[,j], family=poisson(link=log))
 #res <- glm(mal_inc1[,i] ~mal_inc1$ONI_DJF+mal_inc1$DMI_ASO+ rain_fall[,j], family=poisson(link=log))
 
-  #chaatisg_inc <- mal_inc1[,9]
-  #chaatisg_inc <- chaatisg_inc[-c(1:6)]
-  
+#chaatisg_inc <- mal_inc1[,9]
+#chaatisg_inc <- chaatisg_inc[-c(1:6)]
+
 #res <- glm(chaatisg_inc ~mal_inc1[(7:24),2]+mal_inc1[(7:24),3]+rain_fall[(7:24),6], family=poisson(link=log))
 
 #res_sum <- summary(res)
@@ -241,6 +254,3 @@ summary(mod_glmer_poisson)
 #write.table(lmciabove_arr, 'CIabove_malpoisson_oni_iod94_rf_mjo.txt')
 
 #write.table(aic_total, 'aic_malpoisson_oni_iod_rf_mjo.txt')
-
-
-##################################  END OF SCRIPT #####################################
