@@ -4,7 +4,7 @@
 #
 #AUTHORS: Benoit Parmentier, Neeti Neeti                                             
 #DATE CREATED: 04/25/2018 
-#DATE MODIFIED: 05/02/2018
+#DATE MODIFIED: 05/04/2018
 #Version: 1
 #PROJECT: India research from Neeti            
 
@@ -43,6 +43,8 @@ library(rgeos) #spatial analysis, topological and geometric operations e.g. inte
 library(sphet) #spatial analyis, regression eg.contains spreg for gmm estimation
 library(reshape2)
 library(lme4)
+library(sf)
+library(INLA)
 
 ###### Functions used in this script
 
@@ -116,12 +118,20 @@ data_fname <- file.path(in_dir,"malaria_incidence_yrs_94dmi_Mjo.csv")
 mal_inc <- read.table(data_fname, header=TRUE, sep=',')
 #rain_index <- read.table('rainfall_index.csv', header=TRUE, sep=',')
 rain_fall <- read.table(file.path(in_dir,'rainfall_data.csv'), header=TRUE, sep=',')
-
-View(mal_inc)
-View(rain_fall)
+#View(mal_inc)
+#View(rain_fall)
 dim(rain_fall)
-View(rain_fall)
 dim(mal_inc)
+
+lf_admin_units_fname <- list.files(path=in_dir,
+                                   pattern="IND_adm.*.shp",
+                                   full.names = T)
+
+region_sf <- st_read(lf_admin_units_fname[2])
+dim(region_sf)
+head(region_sf)
+View(region_sf)
+plot(region_sf)
 
 ###### PART I: Reformat data and link to shapefile #################
 ### Need to combine both together.
@@ -161,7 +171,8 @@ class(data_df$state)
 class(data_df$ONI_DJF)
 
 
-mod_glm_poisson <- glm(mal_inc ~ state + year + ONI_DJF + DMI_ASO + MJO_DJFM + MJO_JJAS, 
+mod_glm_poisson <- glm(mal_inc ~ state + year + 
+                         ONI_DJF + DMI_ASO + MJO_DJFM + MJO_JJAS, 
                        data=data_df,
                        family=poisson(link=log))
 mod_glm_poisson
@@ -170,19 +181,19 @@ summary(mod_glm_poisson)
 plot(mal_inc ~ year,data=data_df)
 xyplot(mal_inc ~ year | state,data=data_df)
 
-plot(mal_inc ~ year, subset(data_df,state=="GOA"))
-plot(mal_inc ~ year, subset(data_df,state=="CHHATTISGARH")) #ok problem in the data, there are zero
+state_selected <- "GOA"
+plot(mal_inc ~ year, subset(data_df,state==state_selected),main=state_selected)
+state_selected <- "CHHATTISGARH"
+plot(mal_inc ~ year, subset(data_df,state==state_selected),main=state_selected)
+ #ok problem in the data, there are zero
                                                             #when it should be NA
+names(data_df$state)
 
 unique(data_df$state)
 #?over dispersion?
-#### Do spatial poisson
+#### Do spatial poisson with Mixed effect model to take into account malaria incidence by year and state
 
-#Maybe mixed effect is needed?
-mod_glm_poisson <- glm(mal_inc ~ state + year + ONI_DJF + DMI_ASO + MJO_DJFM + MJO_JJAS, 
-                       data=data_df,
-                       family=poisson(link=log))
-summary(mod_glm_poisson)
+
 ### Mixed effect model
 #https://bbolker.github.io/mixedmodels-misc/glmmFAQ.html
 
@@ -190,8 +201,14 @@ summary(mod_glm_poisson)
 #https://stats.idre.ucla.edu/other/mult-pkg/introduction-to-generalized-linear-mixed-models/
 #https://rpubs.com/wsundstrom/t_panel
 
-mod_glmer_poisson <- glmer(mal_inc ~ year + ONI_DJF + DMI_ASO + MJO_DJFM + MJO_JJAS + (1|state), 
+### Intercept model!!! not what we want
+mod_glmer_poisson <- glmer(mal_inc ~ year + 
+                             ONI_DJF + DMI_ASO + MJO_DJFM + MJO_JJAS + (1|state), 
       data = data_df, family = poisson(link=log))
+summary(mod_glmer_poisson)
+
+ranef(mod_glmer_poisson)$year
+ranef(mod_glmer_poisson)
 
 #mod_glmer_poisson <- glmer(mal_inc ~ year + ONI_DJF + DMI_ASO + MJO_DJFM + MJO_JJAS |state, 
 #                           data = data_df, family = poisson(link=log))
@@ -200,22 +217,45 @@ mod_glmer_poisson <- glmer(mal_inc ~ year + ONI_DJF + DMI_ASO + MJO_DJFM + MJO_J
 ### here we model the slope and intercept per state for the year variable
 #as random effect
 ### we also have the overall slope for year (fixed effect) and slopes for other var
-mod_glmer_poisson <- glmer(mal_inc ~ year + (1+ year| state) + 
+mod_glmer_poisson_year <- glmer(mal_inc ~ year + (1+ year| state) + 
                              ONI_DJF + DMI_ASO + MJO_DJFM + MJO_JJAS , 
                            data = data_df, family = poisson(link=log))
 
-summary(mod_glmer_poisson) #did not converge...
+summary(mod_glmer_poisson_year) #did not converge...
 
-summary(mod_glmer_poisson)
 # should we normalize by area?
 
-#install.packages("INLA", repos=c(getOption("repos"), INLA="https://inla.r-inla-download.org/R/stable"), dep=TRUE)
+############# INLA model
+
+mod_inla_poisson <- inla(mal_inc ~ year + f(state,model="iid") + 
+                             ONI_DJF + DMI_ASO + MJO_DJFM + MJO_JJAS , 
+                           data = data_df, family = "poisson")
+
+mod_inla_poisson
+plot(mod_inla_poisson)
+### spcefication is wrong
+#formula <- mal_inc ~ year + f()
+mod_inla_poisson <- inla(mal_inc ~ year + f(year,state,model="iid") + 
+                           ONI_DJF + DMI_ASO + MJO_DJFM + MJO_JJAS , 
+                         data = data_df, family = "poisson")
 
 
+mod_inla_poisson
+summary(mod_inla_poisson)
 
 ############# Spatial model
 
+cat(as.character(region_sf$NAME_1))
+cat(as.character(data_df$state)[1:3])
 
+test <- agrep(as.character(region_sf$NAME_1)[3],
+      as.character(data_df$state))             
+#agrep("lasy", "1 lazy 2")
+             
+             
+### join data with names of states
+sort(unique(data_df$state))
+as.character(region_sf$NAME_1)
 
 ##################################  END OF SCRIPT #####################################
 
