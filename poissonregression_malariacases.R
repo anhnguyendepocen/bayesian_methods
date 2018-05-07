@@ -220,6 +220,7 @@ ranef(mod_glmer_poisson)
 mod_glmer_poisson_year <- glmer(mal_inc ~ year + (1+ year| state) + 
                              ONI_DJF + DMI_ASO + MJO_DJFM + MJO_JJAS , 
                            data = data_df, family = poisson(link=log))
+#refit(mod_glmer_poisson_year)
 
 summary(mod_glmer_poisson_year) #did not converge...
 
@@ -232,13 +233,13 @@ mod_inla_poisson <- inla(mal_inc ~ year + f(state,model="iid") +
                            data = data_df, family = "poisson")
 
 mod_inla_poisson
-plot(mod_inla_poisson)
+
 ### spcefication is wrong
 #formula <- mal_inc ~ year + f()
+data_df$state <- as.factctor(data_df$state)
 mod_inla_poisson <- inla(mal_inc ~ year + f(year,state,model="iid") + 
                            ONI_DJF + DMI_ASO + MJO_DJFM + MJO_JJAS , 
                          data = data_df, family = "poisson")
-
 
 mod_inla_poisson
 summary(mod_inla_poisson)
@@ -254,9 +255,99 @@ test <- agrep(as.character(region_sf$NAME_1)[3],
              
              
 ### join data with names of states
-sort(unique(data_df$state))
-as.character(region_sf$NAME_1)
+region_sf$state <- unique(as.character(data_df$state))
+View(region_sf)
 
+as.character(region_sf$NAME_1)
+as.character(region_sf$state)
+
+state_df <- read.table(file.path(in_dir,"state_labeling_matching.csv"),sep=",")
+names(state_df) <- c("Names","state")
+region_sf$state <- state_df$state
+View(region_sf)
+
+data_sf <- merge(region_sf, data_df,by="state")
+dim(data_sf)
+class(data_sf)
+#missing states
+plot(data_sf$geometry)
+
+## keep all
+data_sf <- merge(region_sf,data_df,by="state",all=T)
+data_sf <- merge(data_df,region_sf,by="state",all=T)
+
+plot(data_sf$geometry)
+plot(data_df$mal_inc)
+dim(data_sf)
+dim(data_df)
+#problem here, we loose some rows
+
+###################
+### Spatial model specification
+
+### First get a neighbour or adjacency matrix object compatible with INLA
+
+region_sp <- as(region_sf,"Spatial")
+temp <- poly2nb(region_sp)
+nb2INLA("LDN.graph", temp)
+#LDN.graph is stored in in the current dir and can be read by INLA
+class(temp)
+LDN.adj <- paste(getwd(),"/LDN.graph",sep="") # full path to the INLA adjacency/graph file 
+
+H <- inla.read.graph(filename="LDN.graph")
+
+## Neighbours for the states: adjacency matrix
+image(inla.graph2matrix(H),xlab="",ylab="")
+
+region_sf$ID_1
+
+names(data_df)
+dim(data_sf)
+class(data_sf)
+View(state_df)
+
+state_df$ID <- 1:36
+
+#Use iCAR specification
+####keep all
+data_df_test <- merge(data_df,state_df,by="state",all=T)
+dim(data_df_test)
+dim(data_df)
+#lossing 8 rows
+names(data_df_test)
+names(data_df)
+formula.par <- y ~ 1 + f(ID,model="bym",graph=LDN.adj)
+
+## use informative priors:
+#1) log of the unstructure effect precision log(tauv) ~ logGamma(1,0.0005)
+
+data_df$y <- data_df$mal_inc
+data_df_test$y <- data_df_test$mal_inc
+
+formula.par <- y ~ 1 + f(ID,model="bym",graph=LDN.adj,
+                         scale.model=TRUE,
+                         hyper=list(prec.unstruct=list(prior="loggamma",param=c(1,0.001)),
+                                    prec.spatial=list(
+                                    prior="loggamma",param=c(1,0.001))))
+
+## In bayesian model, priors impact the results so should do a sensitivity analysis
+
+names(data_df)
+mod_spatial_inla <- inla(formula.par,
+                         family = "poisson",
+                         data=data_df_test,
+                         E=E, #not found because not defined.
+                         control.compute=list(dic=T))
+
+mod_spatial_inla <- inla(formula.par,
+                         family = "poisson",
+                         data=data_df_test,
+#                         E=E,
+                         control.compute=list(dic=T))
+
+summary(mod_spatial_inla)
+
+    
 ##################################  END OF SCRIPT #####################################
 
 
