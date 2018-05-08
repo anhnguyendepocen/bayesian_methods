@@ -4,7 +4,7 @@
 #
 #AUTHORS: Benoit Parmentier, Neeti Neeti                                             
 #DATE CREATED: 04/25/2018 
-#DATE MODIFIED: 05/04/2018
+#DATE MODIFIED: 05/08/2018
 #Version: 1
 #PROJECT: India research from Neeti            
 
@@ -237,7 +237,14 @@ mod_inla_poisson
 ### spcefication is wrong
 #formula <- mal_inc ~ year + f()
 data_df$state <- as.factctor(data_df$state)
-mod_inla_poisson <- inla(mal_inc ~ year + f(year,state,model="iid") + 
+data_df$year1 <- data_df$year
+class(data_df$state)
+data_df$state <- factor(data_df$state) #must be factro
+data_df$year1
+data_df$state
+
+##Not working right now
+mod_inla_poisson <- inla(mal_inc ~ year + f(year1,state,model="iid") + 
                            ONI_DJF + DMI_ASO + MJO_DJFM + MJO_JJAS , 
                          data = data_df, family = "poisson")
 
@@ -347,7 +354,35 @@ mod_spatial_inla <- inla(formula.par,
 
 summary(mod_spatial_inla)
 
-    
+## fixed effect (b0)    
+round(mod_spatial_inla$summary.fixed,3)
+## random effects
+round(mod_spatial_inla$summary.random$ID,3)
+# check p. 184, Spatial and Spatio-temporal Bayesian Models with R
+
+
+##### PART 4: Spatial model with covariates (Ecological regression)
+
+formula.par <- y ~ 1 +
+               ONI_DJF + DMI_ASO + MJO_DJFM + MJO_JJAS +
+              f(ID,model="bym",graph=LDN.adj,
+                         scale.model=TRUE,
+                         hyper=list(prec.unstruct=list(prior="loggamma",param=c(1,0.001)),
+                                    prec.spatial=list(
+                                      prior="loggamma",param=c(1,0.001))))
+
+## In bayesian model, priors impact the results so should do a sensitivity analysis
+
+names(data_df)
+mod2_spatial_inla <- inla(formula.par,
+                         family = "poisson",
+                         data=data_df_test,
+#                         E=E, #not found because not defined.
+                         control.compute=list(dic=T))
+
+summary(mod2_spatial_inla)
+
+
 ##################################  END OF SCRIPT #####################################
 
 
