@@ -243,13 +243,23 @@ data_df$state <- factor(data_df$state) #must be factro
 data_df$year1
 data_df$state
 
-##Not working right now
-mod_inla_poisson <- inla(mal_inc ~ year + f(year1,state,model="iid") + 
+## This should work now: slope by state:
+# year1 | state is f(state,year1,model="ii)
+mod_inla_poisson <- inla(mal_inc ~ year + f(state,year1,model="iid") + 
                            ONI_DJF + DMI_ASO + MJO_DJFM + MJO_JJAS , 
                          data = data_df, family = "poisson")
 
+
 mod_inla_poisson
 summary(mod_inla_poisson)
+str(mod_inla_poisson)
+names(mod_inla_poisson)
+
+#ranef(mod_glm_poisson$coefficients)
+
+### We need to include an interaction, that may occur between slope and intercept?
+## seee p.114 Bayesian Regression Modeling with INLA
+
 
 ############# Spatial model
 
