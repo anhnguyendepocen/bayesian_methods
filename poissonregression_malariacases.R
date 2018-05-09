@@ -45,6 +45,7 @@ library(reshape2)
 library(lme4)
 library(sf)
 library(INLA)
+library(MCMCglmm)
 
 ###### Functions used in this script
 
@@ -71,9 +72,13 @@ create_dir_fun <- function(outDir,out_suffix=NULL){
 #in_dir <- "/home/bparmentier/Google Drive/Data/India_Research/malaria_study_by_state/data"
 #out_dir <- "/home/bparmentier/Google Drive/Data/India_Research/malaria_study_by_state/outputs"
 
-in_dir <- "/home/benoit/Data/India_Research/malaria_study_by_state/data"
-out_dir <- "/home/benoit/Data/India_Research/malaria_study_by_state/outputs"
+#in_dir <- "/home/benoit/Data/India_Research/malaria_study_by_state/data"
+#out_dir <- "/home/benoit/Data/India_Research/malaria_study_by_state/outputs"
 
+##local
+in_dir <- "/home/bparmentier/c_drive/Users/bparmentier/Data/India_research/malaria_study_by_state/data"
+out_dir <- "/home/bparmentier/c_drive/Users/bparmentier/Data/India_research/malaria_study_by_state/outputs"
+  
 #proj_modis_str <-"+proj=sinu +lon_0=0 +x_0=0 +y_0=0 +a=6371007.181 +b=6371007.181 +units=m +no_defs" #CONST 1
 #CRS_interp <-"+proj=longlat +ellps=WGS84 +datum=WGS84 +towgs84=0,0,0" #Station coords WGS84
 CRS_WGS84 <- "+proj=longlat +ellps=WGS84 +datum=WGS84 +towgs84=0,0,0" #Station coords WGS84 # CONST 2
@@ -83,7 +88,7 @@ CRS_reg <- CRS_WGS84 # PARAM 4
 file_format <- ".tif" #PARAM5
 NA_value <- -9999 #PARAM6
 NA_flag_val <- NA_value #PARAM7
-out_suffix <-"malaria_india_04302018" #output suffix for the files and ouptu folder #PARAM 8
+out_suffix <-"malaria_india_05092018" #output suffix for the files and ouptu folder #PARAM 8
 create_out_dir_param=TRUE #PARAM9
 
 #data_fname <- file.path(in_dir,"dat_reg2_var_list_NDVI_NDVI_Katrina_04102015.txt")
@@ -203,7 +208,8 @@ unique(data_df$state)
 
 ### Intercept model!!! not what we want
 mod_glmer_poisson <- glmer(mal_inc ~ year + 
-                             ONI_DJF + DMI_ASO + MJO_DJFM + MJO_JJAS + (1|state), 
+                             ONI_DJF + DMI_ASO + MJO_DJFM + MJO_JJAS + 
+                             (1|state), 
       data = data_df, family = poisson(link=log))
 summary(mod_glmer_poisson)
 
