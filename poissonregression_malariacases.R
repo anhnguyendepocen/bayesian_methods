@@ -4,7 +4,7 @@
 #
 #AUTHORS: Benoit Parmentier, Neeti Neeti                                             
 #DATE CREATED: 04/25/2018 
-#DATE MODIFIED: 05/08/2018
+#DATE MODIFIED: 05/21/2018
 #Version: 1
 #PROJECT: India research from Neeti            
 
@@ -88,14 +88,16 @@ CRS_reg <- CRS_WGS84 # PARAM 4
 file_format <- ".tif" #PARAM5
 NA_value <- -9999 #PARAM6
 NA_flag_val <- NA_value #PARAM7
-out_suffix <-"malaria_india_05092018" #output suffix for the files and ouptu folder #PARAM 8
+out_suffix <-"malaria_india_05212018" #output suffix for the files and ouptu folder #PARAM 8
 create_out_dir_param=TRUE #PARAM9
 
-#data_fname <- file.path(in_dir,"dat_reg2_var_list_NDVI_NDVI_Katrina_04102015.txt")
+### data files:
+infile_data_name <- "malaria_incidence_yrs_94dmi_Mjo.csv"
+infile_name_rainfall <- "rainfall_data.csv"
+admin_units_fname <- "IND_adm1.shp" #states and Union Territories of India
+state_labeling_matching_fname <- "state_labeling_matching.csv"
 
 ################# START SCRIPT ###############################
-
-### PART I READ AND PREPARE DATA FOR REGRESSIONS #######
 
 #set up the working directory
 #Create output directory
@@ -112,60 +114,97 @@ if(create_out_dir_param==TRUE){
   setwd(out_dir) #use previoulsy defined directory
 }
 
-#data_tb <-read.table(data_fname,sep=",",header=T)
+### PART I: READ AND PREPARE DATA FOR REGRESSIONS #######
 
-#data_fname <- file.path(in_dir,"malaria_incidence_yrs.csv")
-data_fname <- file.path(in_dir,"malaria_incidence_yrs_94dmi_Mjo.csv")
-
-#mal_inc <- read.table('malaria_incidence_yrs.csv', header=TRUE, sep=',')
-#mal_inc <- read.table('malaria_incidence_yrs_94dmi_Mjo.csv', header=TRUE, sep=',')
-
+data_fname <- file.path(in_dir,infile_data_name)
 mal_inc <- read.table(data_fname, header=TRUE, sep=',')
-#rain_index <- read.table('rainfall_index.csv', header=TRUE, sep=',')
-rain_fall <- read.table(file.path(in_dir,'rainfall_data.csv'), header=TRUE, sep=',')
-#View(mal_inc)
-#View(rain_fall)
+
+rainfall <- read.table(file.path(in_dir,infile_name_rain_fall), 
+                        header=TRUE, sep=',')
+
 dim(rain_fall)
 dim(mal_inc)
 
-lf_admin_units_fname <- list.files(path=in_dir,
-                                   pattern="IND_adm.*.shp",
-                                   full.names = T)
-
-region_sf <- st_read(lf_admin_units_fname[2])
+#### Read in spatial data geometry definitions: polygons of states  
+region_sf <- st_read(file.path(in_dir,admin_units_fname))
 dim(region_sf)
 head(region_sf)
-View(region_sf)
-plot(region_sf)
+plot(region_sf$geometry)
+
+#state_df <- read.table(file.path(in_dir,"state_labeling_matching.csv"),sep=",")
+#state_labeling_matching_fname <- "state_labeling_matching.csv"
+state_df <- read.table(file.path(in_dir,state_labeling_matching_fname),sep=",")
 
 ###### PART I: Reformat data and link to shapefile #################
 ### Need to combine both together.
 
-names(mal_inc)[1] <- "year"
-View(mal_inc)
-names(mal_inc)[1:5]
+names(mal_inc)[1] <- "year" #naming first column of data
+head(mal_inc)
+names(mal_inc)[1:5] #checking first five names
 
 n <- ncol(mal_inc)
-n
 
-test <- as.data.frame(t(mal_inc[6:n]))
-names(mal_inc)[2:5]
+#### Reformat the dataset to have rows as spatial entities (states)
+### Select states stored from columns 6
+df_tmp <- as.data.frame(t(mal_inc[6:n])) 
+head(df_tmp)
 
-names(test) <- 1994:2017
-test$state <- rownames(test)
-mdata <- melt(test, 
+names(df_tmp) <- 1994:2017 #assign year as name of column
+df_tmp$state <- rownames(df_tmp)
+####
+mdata <- melt(df_tmp, 
               variable.name =c("state"),
               value.names = c("state","year")
               #id=c("state","year")
               )
+
+names(mal_inc)[2:5] #explanatory variables used here
+
 names(mdata)[2] <- "year"
-View(mdata)
-names(mdata)[3] <- "mal_inc" 
-View(mdata)
-#### join climate indices by dates
+names(mdata)[3] <- "mal_inc" #malaria incidence
+head(mdata)
+dim(mdata) #864x3 
+#24*36: 24 years and 36 states (includes Union Territories)
+
+#### Join back climate indices by dates for each state
 data_df <- merge(mdata,mal_inc[,1:5],by="year")
 
-View(data_df)
+head(data_df)
+
+####### Now add spatial data
+
+cat(as.character(region_sf$NAME_1))
+cat(as.character(data_df$state)[1:3])
+
+### join data with names of states
+region_sf$state <- unique(as.character(data_df$state))
+head(region_sf)
+
+names(state_df) <- c("Names","state")
+region_sf$state <- state_df$state
+head(region_sf)
+
+### join base on names of state matched
+data_sf <- merge(region_sf, data_df,by="state")
+dim(data_sf) #note now 576x17
+class(data_sf)
+head(data_sf)
+#missing states
+plot(data_sf$geometry)
+
+## keep all
+data_sf <- merge(region_sf,data_df,by="state",all=T)
+#data_sf <- merge(data_df,region_sf,by="state",all=T)
+
+plot(data_sf$geometry)
+plot(data_df$mal_inc)
+dim(data_sf)#876x17
+dim(data_df) #now 864x7
+#problem here, we loose some rows
+
+
+###### PART II: Test GLM and GLMER regressions #################
+###### First using lme4 and then Bayesian INLA 
 
 #mod_glm_poisson <- glm(mal_inc ~ ONI_DJF + DMI_ASO + MJO_DJFM + MJO_JJAS + rain_fall[,j], 
 #                       data=data_df,
@@ -174,7 +213,6 @@ View(data_df)
 data_df$year <- as.numeric(as.character(data_df$year))
 class(data_df$state)
 class(data_df$ONI_DJF)
-
 
 mod_glm_poisson <- glm(mal_inc ~ state + year + 
                          ONI_DJF + DMI_ASO + MJO_DJFM + MJO_JJAS, 
@@ -232,7 +270,6 @@ summary(mod_glmer_poisson_year) #did not converge...
 
 # should we normalize by area?
 
-############# INLA model
 
 mod_inla_poisson <- inla(mal_inc ~ year + f(state,model="iid") + 
                              ONI_DJF + DMI_ASO + MJO_DJFM + MJO_JJAS , 
@@ -266,44 +303,8 @@ names(mod_inla_poisson)
 ### We need to include an interaction, that may occur between slope and intercept?
 ## seee p.114 Bayesian Regression Modeling with INLA
 
+###### PART III: Spatial regressions #################
 
-############# Spatial model
-
-cat(as.character(region_sf$NAME_1))
-cat(as.character(data_df$state)[1:3])
-
-test <- agrep(as.character(region_sf$NAME_1)[3],
-      as.character(data_df$state))             
-#agrep("lasy", "1 lazy 2")
-             
-             
-### join data with names of states
-region_sf$state <- unique(as.character(data_df$state))
-View(region_sf)
-
-as.character(region_sf$NAME_1)
-as.character(region_sf$state)
-
-state_df <- read.table(file.path(in_dir,"state_labeling_matching.csv"),sep=",")
-names(state_df) <- c("Names","state")
-region_sf$state <- state_df$state
-View(region_sf)
-
-data_sf <- merge(region_sf, data_df,by="state")
-dim(data_sf)
-class(data_sf)
-#missing states
-plot(data_sf$geometry)
-
-## keep all
-data_sf <- merge(region_sf,data_df,by="state",all=T)
-data_sf <- merge(data_df,region_sf,by="state",all=T)
-
-plot(data_sf$geometry)
-plot(data_df$mal_inc)
-dim(data_sf)
-dim(data_df)
-#problem here, we loose some rows
 
 ###################
 ### Spatial model specification
@@ -327,7 +328,7 @@ region_sf$ID_1
 names(data_df)
 dim(data_sf)
 class(data_sf)
-View(state_df)
+head(state_df)
 
 state_df$ID <- 1:36
 
@@ -397,6 +398,9 @@ mod2_spatial_inla <- inla(formula.par,
                          control.compute=list(dic=T))
 
 summary(mod2_spatial_inla)
+
+
+###### PART IV: Spatio-temporal models #################
 
 
 ##################################  END OF SCRIPT #####################################
