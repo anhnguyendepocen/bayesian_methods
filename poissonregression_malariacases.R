@@ -252,7 +252,7 @@ mod_glmer_poisson <- glmer(mal_inc ~ year +
 summary(mod_glmer_poisson)
 
 ranef(mod_glmer_poisson)$year
-ranef(mod_glmer_poisson)
+ranef(mod_glmer_poisson) #different intercepte by state
 
 #mod_glmer_poisson <- glmer(mal_inc ~ year + ONI_DJF + DMI_ASO + MJO_DJFM + MJO_JJAS |state, 
 #                           data = data_df, family = poisson(link=log))
@@ -266,6 +266,13 @@ mod_glmer_poisson_year <- glmer(mal_inc ~ year + (1+ year| state) +
                            data = data_df, family = poisson(link=log))
 #refit(mod_glmer_poisson_year)
 
+mod_glmer_poisson_year <- glmer(mal_inc ~ year + (1+ year| state) + 
+                                  ONI_DJF + DMI_ASO + MJO_DJFM + MJO_JJAS , 
+                                data = data_df, family = poisson(link=log),
+                                control=glmerControl(optimizer="bobyqa"))
+
+#glmer(DV ~ covariate*condition + (condition*covariate|subjects), data=data, 
+#      family="binomial"(link="logit"), control=glmerControl(optimizer="bobyqa"))
 summary(mod_glmer_poisson_year) #did not converge...
 
 # should we normalize by area?
